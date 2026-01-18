@@ -1,8 +1,9 @@
 import pandas as pd
 import time
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score , balanced_accuracy_score
 from tabpfn import TabPFNClassifier
+
 
 # Load dataset
 df = pd.read_csv("../datasets/breast_cancer/breast_cancer.csv")
@@ -38,3 +39,4 @@ print("TabPFN Evaluation Results (Breast Cancer Dataset)")
 print(f"Accuracy: {accuracy:.4f}")
 print(f"F1-Score: {f1:.4f}")
 print(f"Inference Time (seconds): {inference_time:.4f}")
+print("Balanced Accuracy Score:",balanced_accuracy_score(y_test, y_pred))

@@ -3,10 +3,14 @@ import numpy as np
 import time
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    balanced_accuracy_score,
+    brier_score_loss
+)
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-
 from tabpfn import TabPFNClassifier
 
 
@@ -15,9 +19,9 @@ from tabpfn import TabPFNClassifier
 # =======================
 DATASET_PATH = "../datasets/breast_cancer/breast_cancer.csv"
 TARGET_COLUMN = "target"
-NOISE_LEVEL = 0.1          # 10% Gaussian noise
-DUPLICATE_RATIO = 0.3      # 30% duplicated rows
-REDUCED_RATIO = 0.5        # use only 50% of data
+NOISE_LEVEL = 0.1
+DUPLICATE_RATIO = 0.3
+REDUCED_RATIO = 0.5
 
 
 # =======================
@@ -60,16 +64,24 @@ def reduce_dataset(X, y, ratio):
 # MODEL EVALUATION
 # =======================
 def evaluate(model, X_train, X_test, y_train, y_test):
+    # ---- FIT TIME ----
+    start_fit = time.time()
     model.fit(X_train, y_train)
+    fit_time = time.time() - start_fit
 
-    start = time.time()
+    # ---- PREDICT TIME ----
+    start_pred = time.time()
     preds = model.predict(X_test)
-    end = time.time()
+    probs = model.predict_proba(X_test)[:, 1]
+    pred_time = time.time() - start_pred
 
     return (
         accuracy_score(y_test, preds),
+        balanced_accuracy_score(y_test, preds),
         f1_score(y_test, preds),
-        end - start
+        brier_score_loss(y_test, probs),
+        fit_time,
+        pred_time
     )
 
 
@@ -89,7 +101,7 @@ models = {
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
 }
 
-print("\nROBUSTNESS EVALUATION RESULTS\n")
+print("\nROBUSTNESS + CALIBRATION + TIMING RESULTS\n")
 
 for exp_name, (X_exp, y_exp) in experiments.items():
     print(f"\n--- {exp_name} ---")
@@ -99,5 +111,16 @@ for exp_name, (X_exp, y_exp) in experiments.items():
     )
 
     for model_name, model in models.items():
-        acc, f1, t = evaluate(model, X_train, X_test, y_train, y_test)
-        print(f"{model_name:20s} | Acc: {acc:.4f} | F1: {f1:.4f} | Time: {t:.4f}s")
+        acc, bal_acc, f1, brier, fit_t, pred_t = evaluate(
+            model, X_train, X_test, y_train, y_test
+        )
+
+        print(
+            f"{model_name:20s} | "
+            f"Acc: {acc:.4f} | "
+            f"BalAcc: {bal_acc:.4f} | "
+            f"F1: {f1:.4f} | "
+            f"Brier: {brier:.4f} | "
+            f"Fit: {fit_t:.4f}s | "
+            f"Pred: {pred_t:.4f}s"
+        )

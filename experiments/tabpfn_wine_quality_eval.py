@@ -1,7 +1,7 @@
 import pandas as pd
 import time
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score ,balanced_accuracy_score
 from tabpfn import TabPFNClassifier
 
 # Load dataset
@@ -25,3 +25,5 @@ print("TabPFN Evaluation - Wine Quality Dataset")
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("F1-score:", f1_score(y_test, y_pred))
 print("Inference Time (s):", end - start)
+print("Balanced Accuracy Score:",balanced_accuracy_score(y_test, y_pred))
+

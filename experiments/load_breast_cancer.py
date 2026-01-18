@@ -4,7 +4,7 @@ import pandas as pd
 # Load dataset
 data = load_breast_cancer()
 
-# Create DataFrame
+# Create DataFrame 
 X = pd.DataFrame(data.data, columns=data.feature_names)
 y = pd.Series(data.target, name="target")
 

@@ -26,11 +26,12 @@ models = get_baseline_models()
 print("Baseline Model Evaluation Results")
 
 for name, model in models.items():
-    acc, f1, time_taken = evaluate_model(
+    acc, f1,bal_acc, time_taken = evaluate_model(
         model, X_train, X_test, y_train, y_test
     )
 
     print(f"\n{name}")
     print(f"Accuracy: {acc:.4f}")
     print(f"F1-Score: {f1:.4f}")
+    print(f"Balanced Accuracy: {bal_acc:.4f}")
     print(f"Inference Time (seconds): {time_taken:.4f}")

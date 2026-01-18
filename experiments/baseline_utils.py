@@ -1,7 +1,7 @@
 import time
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score , balanced_accuracy_score
 
 
 def evaluate_model(model, X_train, X_test, y_train, y_test):
@@ -13,9 +13,10 @@ def evaluate_model(model, X_train, X_test, y_train, y_test):
 
     accuracy = accuracy_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
+    bal_acc = balanced_accuracy_score(y_test, y_pred)
     inference_time = end - start
 
-    return accuracy, f1, inference_time
+    return accuracy, f1, bal_acc , inference_time
 
 
 def get_baseline_models():
