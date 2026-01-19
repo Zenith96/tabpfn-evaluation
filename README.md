@@ -5,6 +5,7 @@ Empirical evaluation of TabPFN on tabular datasets
 
 This project evaluates TabPFN on tabular classification problems and compares its performance against classical machine learning baselines.
 The focus is on performance, robustness, calibration, stability, and computational behavior, using clean and reproducible experimental scripts.
+
 # Objectives
 
 The project aims to answer the following questions:
@@ -20,29 +21,6 @@ How robust is the model to noise, duplicates, and reduced data?
 Are results stable across different random seeds?
 
 How does fit time vs inference time compare across models?
-
-# Project Structure
-project-root/
-│
-├── datasets/
-│   └── breast_cancer/
-│       └── breast_cancer.csv
-│
-├── scripts/
-│   ├── baseline_eval.py
-│   ├── tabpfn_breast_cancer_eval.py
-│   ├── robustness_eval.py
-│   ├── stability_eval.py
-│   ├── seed_sensitivity_eval.py
-│   └── tabpfn_vs_baselines_summary.py
-│
-├── results/
-│   ├── tabpfn_vs_baselines_summary.csv
-│   └── ...
-│
-├── notebooks/          # optional (exploration)
-├── src/                # optional (future extensions)
-└── README.md
 
 # Models Evaluated
 
