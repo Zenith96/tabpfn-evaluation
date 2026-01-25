@@ -1,62 +1,35 @@
-import pandas as pd
-import numpy as np
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-
 from tabpfn import TabPFNClassifier
 
+from utils.result_logger import save_result
 
-# =======================
-# CONFIG
-# =======================
+DATASET = "Breast Cancer"
+EVAL_TYPE = "size_sensitivity"
 DATASET_PATH = "../datasets/breast_cancer/breast_cancer.csv"
-TARGET_COLUMN = "target"
-
 TRAIN_RATIOS = [0.2, 0.4, 0.6, 0.8, 1.0]
 RANDOM_STATE = 42
 
-
-# =======================
-# LOAD DATA
-# =======================
 df = pd.read_csv(DATASET_PATH)
-X = df.drop(columns=[TARGET_COLUMN])
-y = df[TARGET_COLUMN]
+X = pd.get_dummies(df.drop(columns=["target"]))
+y = df["target"]
 
-X = pd.get_dummies(X)
-
-
-# =======================
-# FIX TEST SET
-# =======================
 X_full_train, X_test, y_full_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=RANDOM_STATE
 )
 
-
-# =======================
-# MODELS
-# =======================
 models = {
-    "TabPFN": TabPFNClassifier(
-        device="cpu",
-        ignore_pretraining_limits=True
-    ),
+    "TabPFN": TabPFNClassifier(device="cpu"),
     "Logistic Regression": LogisticRegression(max_iter=1000),
-    "Random Forest": RandomForestClassifier(
-        n_estimators=100,
-        random_state=RANDOM_STATE
-    )
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE)
 }
-
-
-# =======================
-# SIZE SENSITIVITY EXPERIMENT
-# =======================
-print("\nDATASET SIZE SENSITIVITY RESULTS\n")
 
 for ratio in TRAIN_RATIOS:
     n_samples = int(len(X_full_train) * ratio)
@@ -64,13 +37,26 @@ for ratio in TRAIN_RATIOS:
     X_train = X_full_train.iloc[:n_samples]
     y_train = y_full_train.iloc[:n_samples]
 
-    print(f"\n--- Training Data: {int(ratio * 100)}% ({n_samples} samples) ---")
+    # CPU safety
+    if len(X_train) > 1000:
+        X_train = X_train.sample(1000, random_state=RANDOM_STATE)
+        y_train = y_train.loc[X_train.index]
 
-    for name, model in models.items():
+    for model_name, model in models.items():
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
 
-        acc = accuracy_score(y_test, preds)
-        f1 = f1_score(y_test, preds)
+        row = {
+            "dataset": DATASET,
+            "model": model_name,
+            "evaluation_type": EVAL_TYPE,
+            "condition": f"train_ratio_{ratio}",
+            "seed": RANDOM_STATE,
+            "accuracy": accuracy_score(y_test, preds),
+            "balanced_accuracy": None,
+            "f1_score": f1_score(y_test, preds),
+            "fit_time": None,
+            "predict_time": None
+        }
 
-        print(f"{name:20s} | Acc: {acc:.4f} | F1: {f1:.4f}")
+        save_result(row, "results/size_sensitivity.csv")

@@ -1,0 +1,4 @@
+dataset,model,accuracy,total_errors,unique_errors,shared_errors,test_size
+Breast Cancer,TabPFN,0.9824561403508771,2,0,2,114
+Breast Cancer,Logistic Regression,0.956140350877193,5,2,3,114
+Breast Cancer,Random Forest,0.9649122807017544,4,1,3,114

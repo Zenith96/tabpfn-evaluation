@@ -1,42 +1,51 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import pandas as pd
 import time
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score , balanced_accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score
 from tabpfn import TabPFNClassifier
+from utils.result_logger import save_result
 
+DATASET = "Breast Cancer"
+MODEL_NAME = "TabPFN"
+EVAL_TYPE = "standard"
+CONDITION = "clean"
 
-# Load dataset
 df = pd.read_csv("../datasets/breast_cancer/breast_cancer.csv")
 
-# Split features and target
 X = df.drop(columns=["target"])
 y = df["target"]
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+SEEDS = [0, 1, 2, 3, 4]
 
-# Initialize TabPFN
-model = TabPFNClassifier(device="cpu")
+for seed in SEEDS:
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=seed, stratify=y
+    )
 
-# Fit (in-context learning)
-model.fit(X_train, y_train)
+    model = TabPFNClassifier(device="cpu")
 
-# Measure inference time
-start_time = time.time()
-y_pred = model.predict(X_test)
-end_time = time.time()
+    start_fit = time.time()
+    model.fit(X_train, y_train)
+    fit_time = time.time() - start_fit
 
-inference_time = end_time - start_time
+    start_pred = time.time()
+    y_pred = model.predict(X_test)
+    predict_time = time.time() - start_pred
 
-# Evaluation metrics
-accuracy = accuracy_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred)
-
-# Output results
-print("TabPFN Evaluation Results (Breast Cancer Dataset)")
-print(f"Accuracy: {accuracy:.4f}")
-print(f"F1-Score: {f1:.4f}")
-print(f"Inference Time (seconds): {inference_time:.4f}")
-print("Balanced Accuracy Score:",balanced_accuracy_score(y_test, y_pred))
+    row = {
+        "dataset": DATASET,
+        "model": MODEL_NAME,
+        "evaluation_type": EVAL_TYPE,
+        "condition": CONDITION,
+        "seed": seed,
+        "accuracy": accuracy_score(y_test, y_pred),
+        "balanced_accuracy": balanced_accuracy_score(y_test, y_pred),
+        "f1_score": f1_score(y_test, y_pred),
+        "fit_time": fit_time,
+        "predict_time": predict_time
+    }
+    
+    save_result(row, "results/standard_eval.csv")

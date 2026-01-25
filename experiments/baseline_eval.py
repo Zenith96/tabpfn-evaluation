@@ -1,37 +1,103 @@
 import pandas as pd
+import numpy as np
+import time
+
 from sklearn.model_selection import train_test_split
-from baseline_utils import evaluate_model, get_baseline_models
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    balanced_accuracy_score,
+    brier_score_loss
+)
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from tabpfn import TabPFNClassifier
 
 
-# CHANGE THIS PATH FOR DIFFERENT DATASETS
+# =======================
+# CONFIG
+# =======================
 DATASET_PATH = "../datasets/breast_cancer/breast_cancer.csv"
 TARGET_COLUMN = "target"
+TEST_SIZE = 0.2
+RANDOM_STATE = 42
 
 
-# Load dataset
+# =======================
+# LOAD DATA
+# =======================
 df = pd.read_csv(DATASET_PATH)
-
 X = df.drop(columns=[TARGET_COLUMN])
 y = df[TARGET_COLUMN]
 
-# One-hot encode if needed
 X = pd.get_dummies(X)
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
 )
 
-models = get_baseline_models()
 
-print("Baseline Model Evaluation Results")
+# =======================
+# MODELS
+# =======================
+models = {
+    "TabPFN": TabPFNClassifier(
+        device="cpu",
+        ignore_pretraining_limits=True
+    ),
+    "Logistic Regression": LogisticRegression(max_iter=1000),
+    "Random Forest": RandomForestClassifier(
+        n_estimators=100,
+        random_state=42
+    )
+}
+
+
+# =======================
+# EVALUATION
+# =======================
+rows = []
 
 for name, model in models.items():
-    acc, f1,bal_acc, time_taken = evaluate_model(
-        model, X_train, X_test, y_train, y_test
-    )
+    # ---- Fit time ----
+    start_fit = time.time()
+    model.fit(X_train, y_train)
+    fit_time = time.time() - start_fit
 
-    print(f"\n{name}")
-    print(f"Accuracy: {acc:.4f}")
-    print(f"F1-Score: {f1:.4f}")
-    print(f"Balanced Accuracy: {bal_acc:.4f}")
-    print(f"Inference Time (seconds): {time_taken:.4f}")
+    # ---- Predict time ----
+    start_pred = time.time()
+    preds = model.predict(X_test)
+    probs = model.predict_proba(X_test)[:, 1]
+    pred_time = time.time() - start_pred
+
+    # ---- Metrics ----
+    acc = accuracy_score(y_test, preds)
+    bal_acc = balanced_accuracy_score(y_test, preds)
+    f1 = f1_score(y_test, preds)
+    brier = brier_score_loss(y_test, probs)
+#dataset,model,evaluation_type,condition,seed,accuracy,balanced_accuracy,f1_score,fit_time,predict_time
+    rows.append({
+        "dataset": "Breast Cancer",
+        "model": name,
+        "accuracy": acc,
+        "balanced_accuracy": bal_acc,
+        "f1_score": f1,
+        "brier_score": brier,
+        "fit_time": fit_time,
+        "predict_time": pred_time
+    })
+
+
+# =======================
+# OUTPUT
+# =======================
+results_df = pd.DataFrame(rows)
+
+print("\nFINAL MODEL COMPARISON SUMMARY\n")
+print(results_df.round(4))
+
+# Optional: save for paper / report
+results_df.to_csv(
+    "../results/baseline_eval.csv",
+    index=False
+)

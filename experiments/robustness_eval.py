@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pandas as pd
 import numpy as np
 import time
@@ -13,114 +17,94 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from tabpfn import TabPFNClassifier
 
+from utils.result_logger import save_result
 
 # =======================
 # CONFIG
 # =======================
+DATASET = "Breast Cancer"
+EVAL_TYPE = "robustness"
 DATASET_PATH = "../datasets/breast_cancer/breast_cancer.csv"
-TARGET_COLUMN = "target"
+
 NOISE_LEVEL = 0.1
 DUPLICATE_RATIO = 0.3
 REDUCED_RATIO = 0.5
 
-
 # =======================
-# DATA LOADING
+# LOAD DATA
 # =======================
 df = pd.read_csv(DATASET_PATH)
-X = df.drop(columns=[TARGET_COLUMN])
-y = df[TARGET_COLUMN]
-
-X = pd.get_dummies(X)
-
+X = pd.get_dummies(df.drop(columns=["target"]))
+y = df["target"]
 
 # =======================
 # ROBUSTNESS FUNCTIONS
 # =======================
 def add_noise(X, noise_level):
-    noise = np.random.normal(0, noise_level, X.shape)
-    return X + noise
-
+    return X + np.random.normal(0, noise_level, X.shape)
 
 def add_duplicates(X, y, ratio):
     n_dup = int(len(X) * ratio)
-    dup_indices = np.random.choice(len(X), n_dup, replace=True)
-
-    X_dup = X.iloc[dup_indices]
-    y_dup = y.iloc[dup_indices]
-
-    X_new = pd.concat([X, X_dup], ignore_index=True)
-    y_new = pd.concat([y, y_dup], ignore_index=True)
-
-    return X_new, y_new
-
+    idx = np.random.choice(len(X), n_dup, replace=True)
+    return (
+        pd.concat([X, X.iloc[idx]], ignore_index=True),
+        pd.concat([y, y.iloc[idx]], ignore_index=True)
+    )
 
 def reduce_dataset(X, y, ratio):
     n = int(len(X) * ratio)
     return X.iloc[:n], y.iloc[:n]
 
-
 # =======================
-# MODEL EVALUATION
+# MODELS
 # =======================
-def evaluate(model, X_train, X_test, y_train, y_test):
-    # ---- FIT TIME ----
-    start_fit = time.time()
-    model.fit(X_train, y_train)
-    fit_time = time.time() - start_fit
-
-    # ---- PREDICT TIME ----
-    start_pred = time.time()
-    preds = model.predict(X_test)
-    probs = model.predict_proba(X_test)[:, 1]
-    pred_time = time.time() - start_pred
-
-    return (
-        accuracy_score(y_test, preds),
-        balanced_accuracy_score(y_test, preds),
-        f1_score(y_test, preds),
-        brier_score_loss(y_test, probs),
-        fit_time,
-        pred_time
-    )
-
-
-# =======================
-# EXPERIMENTS
-# =======================
-experiments = {
-    "Original": (X, y),
-    "With Noise": (add_noise(X, NOISE_LEVEL), y),
-    "With Duplicates": add_duplicates(X, y, DUPLICATE_RATIO),
-    "Reduced Data": reduce_dataset(X, y, REDUCED_RATIO)
-}
-
 models = {
-    "TabPFN": TabPFNClassifier(device="cpu", ignore_pretraining_limits=True),
+    "TabPFN": TabPFNClassifier(device="cpu"),
     "Logistic Regression": LogisticRegression(max_iter=1000),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
 }
 
-print("\nROBUSTNESS + CALIBRATION + TIMING RESULTS\n")
+experiments = {
+    "original": (X, y),
+    "noise": (add_noise(X, NOISE_LEVEL), y),
+    "duplicates": add_duplicates(X, y, DUPLICATE_RATIO),
+    "reduced": reduce_dataset(X, y, REDUCED_RATIO)
+}
 
-for exp_name, (X_exp, y_exp) in experiments.items():
-    print(f"\n--- {exp_name} ---")
-
+# =======================
+# RUN EXPERIMENTS
+# =======================
+for condition, (X_exp, y_exp) in experiments.items():
     X_train, X_test, y_train, y_test = train_test_split(
         X_exp, y_exp, test_size=0.2, random_state=42
     )
 
-    for model_name, model in models.items():
-        acc, bal_acc, f1, brier, fit_t, pred_t = evaluate(
-            model, X_train, X_test, y_train, y_test
-        )
+    # CPU safety for TabPFN
+    if len(X_train) > 1000:
+        X_train = X_train.sample(1000, random_state=42)
+        y_train = y_train.loc[X_train.index]
 
-        print(
-            f"{model_name:20s} | "
-            f"Acc: {acc:.4f} | "
-            f"BalAcc: {bal_acc:.4f} | "
-            f"F1: {f1:.4f} | "
-            f"Brier: {brier:.4f} | "
-            f"Fit: {fit_t:.4f}s | "
-            f"Pred: {pred_t:.4f}s"
-        )
+    for model_name, model in models.items():
+        start_fit = time.time()
+        model.fit(X_train, y_train)
+        fit_time = time.time() - start_fit
+
+        start_pred = time.time()
+        preds = model.predict(X_test)
+        probs = model.predict_proba(X_test)[:, 1]
+        pred_time = time.time() - start_pred
+
+        row = {
+            "dataset": DATASET,
+            "model": model_name,
+            "evaluation_type": EVAL_TYPE,
+            "condition": condition,
+            "seed": 42,
+            "accuracy": accuracy_score(y_test, preds),
+            "balanced_accuracy": balanced_accuracy_score(y_test, preds),
+            "f1_score": f1_score(y_test, preds),
+            "fit_time": fit_time,
+            "predict_time": pred_time
+        }
+
+        save_result(row, "results/robustness_eval.csv")
